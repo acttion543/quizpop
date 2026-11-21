@@ -5,6 +5,8 @@ import {
   advance,
   assertActive,
   GameError,
+  leaveLobby,
+  renamePlayer,
   publicRoom,
   settle,
   submitAnswer,
@@ -213,6 +215,15 @@ export async function POST(req: NextRequest) {
       });
       return response({ pin, role: "player", playerId: user.uid });
     }
+    if (data.action === "leave") {
+      await mutateRoom(pin, (room) => {
+        assertActive(room, Date.now());
+        leaveLobby(room, user.uid);
+      });
+      return response({ ok: true });
+    }
+    if (data.action === "rename")
+      await rateLimit("rename_" + hash(user.uid), 30, 60000);
     await mutateRoom(pin, (room) => {
       const now = Date.now();
       assertActive(room, now);
@@ -222,7 +233,9 @@ export async function POST(req: NextRequest) {
         if (data.index !== room.index || data.phase !== room.phase)
           throw new GameError("สถานะเกมเปลี่ยนแล้ว กรุณาลองอีกครั้ง", 409);
         advance(room, now);
-      } else if (data.action === "end" && who.host) room.phase = "finished";
+      } else if (data.action === "rename" && who.playerId)
+        renamePlayer(room, who.playerId, data.name);
+      else if (data.action === "end" && who.host) room.phase = "finished";
       else if (data.action === "answer" && who.playerId)
         submitAnswer(room, who.playerId, data.choice, data.index, now);
       else throw new GameError("ไม่สามารถทำรายการนี้ได้", 403);

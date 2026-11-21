@@ -5,6 +5,8 @@ import {
   advance,
   assertActive,
   publicRoom,
+  leaveLobby,
+  renamePlayer,
   scoreAnswer,
   settle,
   submitAnswer,
@@ -149,4 +151,107 @@ test("player capacity is bounded at 50", () => {
     () => addPlayer(r, "overflow", "", "Extra", "🦊", 100),
     /ห้องเต็ม/,
   );
+});
+
+test("leaving the lobby removes the participant from attendance and final results", () => {
+  const r = room();
+  leaveLobby(r, "a");
+  const lobby = publicRoom(r, true, null, 500);
+  assert.deepEqual(
+    lobby.players.map((p) => p.id),
+    ["b"],
+  );
+  assert.equal(
+    lobby.players.some((p) => p.name === "Alice"),
+    false,
+  );
+  assert.equal(Object.keys(r.players).length, 1);
+  advance(r, 1000);
+  submitAnswer(r, "b", 3, 0, 2000);
+  assert.equal(r.phase, "reveal");
+  advance(r, 3000);
+  submitAnswer(r, "b", 3, 1, 4000);
+  advance(r, 5000);
+  assert.equal(r.phase, "finished");
+  assert.deepEqual(
+    publicRoom(r, true, null, 5000).players.map((p) => p.id),
+    ["b"],
+  );
+});
+test("leaving is idempotent and the player can rejoin before the start", () => {
+  const r = room();
+  const bob = structuredClone(r.players.b);
+  leaveLobby(r, "a");
+  leaveLobby(r, "a");
+  assert.deepEqual(r.players.b, bob);
+  addPlayer(r, "a", "", "Alice", "🦊", 300);
+  assert.equal(r.players.a.name, "Alice");
+  assert.equal(Object.keys(r.players).length, 2);
+});
+test("the last participant leaving does not leave a ghost eligible for starting", () => {
+  const r = room();
+  leaveLobby(r, "a");
+  leaveLobby(r, "b");
+  assert.throws(() => advance(r, 1000), /อย่างน้อย/);
+  assert.equal(r.phase, "lobby");
+});
+test("a start racing with leaving preserves participants and exam records", () => {
+  for (const phase of ["question", "reveal", "finished"] as const) {
+    const r = room();
+    advance(r, 1000);
+    r.phase = phase;
+    const before = structuredClone(r);
+    assert.throws(() => leaveLobby(r, "a"), { status: 409 });
+    assert.deepEqual(r, before);
+  }
+});
+test("renaming the lobby player is visible to the host and other players", () => {
+  const r = room();
+  renamePlayer(r, "a", "  ชื่อใหม่  ");
+  assert.equal(
+    publicRoom(r, true, null, 500).players.find((p) => p.id === "a")?.name,
+    "ชื่อใหม่",
+  );
+  assert.equal(
+    publicRoom(r, false, "b", 500).players.find((p) => p.id === "a")?.name,
+    "ชื่อใหม่",
+  );
+  assert.equal(r.players.b.name, "Bob");
+});
+test("renaming during a question preserves identity, submitted answers and points", () => {
+  const r = room();
+  advance(r, 1000);
+  submitAnswer(r, "a", 3, 0, 2000);
+  const playerBefore = structuredClone(r.players.a);
+  const answersBefore = structuredClone(r.answers);
+  renamePlayer(r, "a", "New Alice");
+  assert.deepEqual(r.players.a, { ...playerBefore, name: "New Alice" });
+  assert.deepEqual(r.answers, answersBefore);
+  const active = publicRoom(r, false, "a", 3000);
+  assert.equal(active.hasAnswered, true);
+  assert.equal(active.myAnswer, null);
+  assert.equal(active.players.find((p) => p.id === "a")?.score, 0);
+  submitAnswer(r, "b", 1, 0, 4000);
+  const revealed = publicRoom(r, true, null, 4000);
+  assert.equal(revealed.players[0].name, "New Alice");
+  assert.equal(revealed.players[0].score, 975);
+});
+test("renaming rejects duplicate and invalid names without changing the player", () => {
+  const r = room();
+  for (const name of [" bob ", "", "   ", "a".repeat(21), null, 123]) {
+    const before = structuredClone(r.players);
+    assert.throws(() => renamePlayer(r, "a", name));
+    assert.deepEqual(r.players, before);
+  }
+  renamePlayer(r, "a", "ALICE");
+  assert.equal(r.players.a.name, "ALICE");
+  assert.throws(() => addPlayer(r, "c", "", "alice", "🐼", 300), /ชื่อนี้/);
+});
+test("missing participants and completed games cannot be renamed", () => {
+  const r = room();
+  assert.throws(() => renamePlayer(r, "stranger", "Name"), { status: 403 });
+  r.phase = "finished";
+  const before = structuredClone(r);
+  assert.throws(() => renamePlayer(r, "a", "Changed"), { status: 409 });
+  assert.deepEqual(r, before);
 });

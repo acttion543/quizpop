@@ -15,6 +15,7 @@ import {
   Layers3,
   LoaderCircle,
   LogOut,
+  Pencil,
   Play,
   Plus,
   Search,
@@ -1202,6 +1203,10 @@ function GameScreen({
     [offset, setOffset] = useState(0),
     [copied, setCopied] = useState(false),
     [confirmEnd, setConfirmEnd] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameError, setNameError] = useState("");
+  const closeRename = useCallback(() => setRenameOpen(false), []);
   const refresh = useRef<() => Promise<void>>(async () => {});
   const closeEnd = useCallback(() => setConfirmEnd(false), []);
   useEffect(() => {
@@ -1209,7 +1214,9 @@ function GameScreen({
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
+    let requestVersion = 0;
     const load = async () => {
+      const version = ++requestVersion;
       try {
         const res = await authFetch(
           `/api/game?pin=${route?.pin}&role=${route?.role}`,
@@ -1217,13 +1224,14 @@ function GameScreen({
         );
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || "เชื่อมต่อไม่ได้");
-        if (!stopped) {
+        if (!stopped && version === requestVersion) {
           setRoom(d);
           setOffset(d.serverNow - Date.now());
           setError("");
         }
       } catch (e) {
-        if (!stopped) setError((e as Error).message);
+        if (!stopped && version === requestVersion)
+          setError((e as Error).message);
       }
     };
     refresh.current = load;
@@ -1252,7 +1260,11 @@ function GameScreen({
   const current = solo
     ? publicRoom(structuredClone(solo), false, "me", time)
     : room;
-  async function action(action: string, extra: Record<string, unknown> = {}) {
+  async function action(
+    action: string,
+    extra: Record<string, unknown> = {},
+    reportError: (message: string) => void = setError,
+  ) {
     setBusy(true);
     setError("");
     try {
@@ -1272,15 +1284,31 @@ function GameScreen({
           phase: current?.phase,
           ...extra,
         });
-        await refresh.current();
+        if (action !== "leave") await refresh.current();
       }
       return true;
     } catch (e) {
-      setError((e as Error).message);
+      reportError((e as Error).message);
       return false;
     } finally {
       setBusy(false);
     }
+  }
+  async function leave() {
+    if (await action("leave")) onHome();
+  }
+  function editName() {
+    setNameDraft(
+      current?.players.find((p) => p.id === current.playerId)?.name || "",
+    );
+    setNameError("");
+    setRenameOpen(true);
+  }
+  async function saveName(e: React.FormEvent) {
+    e.preventDefault();
+    setNameError("");
+    if (await action("rename", { name: nameDraft }, setNameError))
+      setRenameOpen(false);
   }
   async function invite() {
     try {
@@ -1362,8 +1390,14 @@ function GameScreen({
         </div>
         <button
           className="icon-button"
-          onClick={() => setConfirmEnd(true)}
-          aria-label="ออกจากเกม"
+          disabled={busy}
+          onClick={() => {
+            if (current.phase === "lobby" && !isHost && !solo) void leave();
+            else setConfirmEnd(true);
+          }}
+          aria-label={
+            current.phase === "lobby" && !isHost ? "ออกจากห้องรอ" : "ออกจากเกม"
+          }
         >
           <LogOut size={21} />
         </button>
@@ -1399,6 +1433,23 @@ function GameScreen({
               {copied ? "คัดลอกลิงก์แล้ว" : "คัดลอกลิงก์ชวนเพื่อน"}
             </button>
           </div>
+          {!isHost && !solo && me && (
+            <div className="lobby-profile">
+              <span className="lobby-profile-avatar">{me.avatar}</span>
+              <div>
+                <small>ชื่อของคุณในห้องนี้</small>
+                <strong>{me.name}</strong>
+              </div>
+              <button
+                className="button white"
+                disabled={busy}
+                onClick={editName}
+              >
+                <Pencil size={16} />
+                เปลี่ยนชื่อ
+              </button>
+            </div>
+          )}
           <div className="lobby-players-heading">
             <h2>
               <Users size={20} />
@@ -1433,9 +1484,24 @@ function GameScreen({
               เริ่มเกมเลย
             </button>
           ) : (
-            <div className="waiting-host">
-              <LoaderCircle className="spin" size={19} />
-              รอโฮสต์เริ่มเกม เตรียมตัวให้พร้อมนะ
+            <div className="lobby-waiting-actions">
+              <div className="waiting-host">
+                <LoaderCircle className="spin" size={19} />
+                รอโฮสต์เริ่มเกม เตรียมตัวให้พร้อมนะ
+              </div>
+              <button
+                className="button leave-lobby-button"
+                disabled={busy}
+                onClick={leave}
+              >
+                {busy ? (
+                  <LoaderCircle className="spin" size={18} />
+                ) : (
+                  <LogOut size={18} />
+                )}
+                ออกจากห้องรอ
+              </button>
+              <p>ออกแล้วชื่อของคุณจะถูกนำออกจากรายชื่อผู้สอบ</p>
             </div>
           )}
         </main>
@@ -1624,11 +1690,23 @@ function GameScreen({
             </div>
           )}
           <div className="play-footer">
-            <span>
-              {isHost
-                ? "หน้าจอโฮสต์ · แชร์จอนี้ให้ผู้เล่น"
-                : `คะแนนของคุณ ${me?.score.toLocaleString() || 0}`}
-            </span>
+            <div className="play-player-tools">
+              <span>
+                {isHost
+                  ? "หน้าจอโฮสต์ · แชร์จอนี้ให้ผู้เล่น"
+                  : `คะแนนของคุณ ${me?.score.toLocaleString() || 0}`}
+              </span>
+              {!isHost && !solo && me && (
+                <button
+                  className="button white rename-game-button"
+                  disabled={busy}
+                  onClick={editName}
+                >
+                  <Pencil size={15} />
+                  เปลี่ยนชื่อ
+                </button>
+              )}
+            </div>
             {control ? (
               <button
                 className="button primary"
@@ -1657,6 +1735,56 @@ function GameScreen({
             )}
           </div>
         </main>
+      )}
+      {renameOpen && (
+        <Modal title="เปลี่ยนชื่อเล่น" onClose={closeRename}>
+          <p className="modal-subtitle">
+            ชื่อใหม่จะแสดงในห้องและบนกระดานคะแนนของทุกคน คะแนนเดิมยังอยู่ครบ
+          </p>
+          <form className="rename-player-form" onSubmit={saveName}>
+            <label htmlFor="player-nickname">
+              ชื่อเล่นใหม่
+              <input
+                id="player-nickname"
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                placeholder="ชื่อที่อยากให้เพื่อน ๆ เรียก"
+                maxLength={20}
+                required
+                autoComplete="off"
+              />
+            </label>
+            <span className="nickname-counter">
+              {nameDraft.trim().length}/20 ตัวอักษร
+            </span>
+            {nameError && (
+              <p className="error" role="alert">
+                {nameError}
+              </p>
+            )}
+            <div className="modal-actions">
+              <button
+                className="button primary full"
+                disabled={busy || !nameDraft.trim()}
+                type="submit"
+              >
+                {busy ? (
+                  <LoaderCircle className="spin" size={18} />
+                ) : (
+                  <Check size={18} />
+                )}
+                บันทึกชื่อ
+              </button>
+              <button
+                className="button soft full"
+                type="button"
+                onClick={closeRename}
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
       {confirmEnd && (
         <Modal title="ออกจากเกมนี้?" onClose={closeEnd}>

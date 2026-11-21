@@ -59,6 +59,33 @@ export function assertActive(
   if (!room || room.expiresAt <= now)
     throw new GameError("ไม่พบห้องนี้หรือห้องหมดอายุแล้ว", 404);
 }
+function validatePlayerName(room: Room, name: unknown, exceptId?: string) {
+  if (typeof name !== "string" || !name.trim() || name.trim().length > 20)
+    throw new GameError("ตั้งชื่อเล่น 1–20 ตัวอักษร");
+  const trimmed = name.trim();
+  if (
+    Object.values(room.players).some(
+      (p) =>
+        p.id !== exceptId &&
+        p.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase(),
+    )
+  )
+    throw new GameError("ชื่อนี้มีคนใช้แล้ว ลองชื่ออื่นนะ");
+  return trimmed;
+}
+export function renamePlayer(room: Room, playerId: string, name: unknown) {
+  const player = room.players[playerId];
+  if (!player) throw new GameError("กรุณาเข้าร่วมห้องก่อน", 403);
+  if (room.phase === "finished")
+    throw new GameError("เกมจบแล้ว ไม่สามารถเปลี่ยนชื่อได้", 409);
+  player.name = validatePlayerName(room, name, playerId);
+}
+export function leaveLobby(room: Room, playerId: string) {
+  if (!room.players[playerId]) return;
+  if (room.phase !== "lobby")
+    throw new GameError("เกมเริ่มแล้ว ไม่สามารถออกจากรายชื่อผู้สอบได้", 409);
+  delete room.players[playerId];
+}
 export function addPlayer(
   room: Room,
   id: string,
@@ -70,18 +97,11 @@ export function addPlayer(
   if (room.phase !== "lobby") throw new GameError("เกมเริ่มแล้ว รอเข้าห้องรอบถัดไป");
   if (Object.keys(room.players).length >= 50)
     throw new GameError("ห้องเต็มแล้ว (สูงสุด 50 คน)");
-  if (typeof name !== "string" || !name.trim() || name.trim().length > 20)
-    throw new GameError("ตั้งชื่อเล่น 1–20 ตัวอักษร");
-  if (
-    Object.values(room.players).some(
-      (p) => p.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase(),
-    )
-  )
-    throw new GameError("ชื่อนี้มีคนใช้แล้ว ลองชื่ออื่นนะ");
+  const validName = validatePlayerName(room, name);
   room.players[id] = {
     id,
     keyHash,
-    name: name.trim(),
+    name: validName,
     avatar,
     score: 0,
     joinedAt: now,
