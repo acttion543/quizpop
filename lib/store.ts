@@ -57,7 +57,10 @@ export async function mutateRoom<T>(pin: string, fn: (room: Room | null) => T) {
     const snap = await tx.get(ref);
     const room = snap.exists ? (snap.data() as Room) : null;
     const result = fn(room);
-    if (room) tx.set(ref, { ...room, deleteAfter: new Date(room.expiresAt) });
+    if (room) {
+      room.revision = (room.revision || 0) + 1;
+      tx.set(ref, { ...room, deleteAfter: new Date(room.expiresAt) });
+    }
     return result;
   });
 }

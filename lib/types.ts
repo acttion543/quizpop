@@ -32,6 +32,7 @@ export type Room = {
   title: string;
   hostHash: string;
   hostUid?: string;
+  revision?: number;
   questions: Question[];
   phase: "lobby" | "question" | "reveal" | "finished";
   index: number;
@@ -43,6 +44,7 @@ export type Room = {
 };
 export type PublicRoom = {
   pin: string;
+  revision: number;
   title: string;
   phase: Room["phase"];
   index: number;
@@ -57,5 +59,6 @@ export type PublicRoom = {
   isHost: boolean;
   playerId: string | null;
   myAnswer: Answer | null;
+  myChoice: number | null;
   hasAnswered: boolean;
 };

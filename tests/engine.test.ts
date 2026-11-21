@@ -72,6 +72,8 @@ test("active question never exposes correct choice, points, secrets or others' a
   assert.equal(p.question?.correct, undefined);
   assert.equal(p.myAnswer, null);
   assert.equal(p.hasAnswered, true);
+  assert.equal(p.myChoice, 3);
+  assert.equal(publicRoom(r, false, "b", 3000).myChoice, null);
   assert.equal(p.players.find((v) => v.id === "a")?.score, 0);
   assert.deepEqual(p.distribution, [0, 0, 0, 0]);
   const json = JSON.stringify(p);

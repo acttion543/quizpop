@@ -224,7 +224,7 @@ export async function POST(req: NextRequest) {
     }
     if (data.action === "rename")
       await rateLimit("rename_" + hash(user.uid), 30, 60000);
-    await mutateRoom(pin, (room) => {
+    const updated = await mutateRoom(pin, (room) => {
       const now = Date.now();
       assertActive(room, now);
       const who = identity(room, user, data.role);
@@ -239,8 +239,17 @@ export async function POST(req: NextRequest) {
       else if (data.action === "answer" && who.playerId)
         submitAnswer(room, who.playerId, data.choice, data.index, now);
       else throw new GameError("ไม่สามารถทำรายการนี้ได้", 403);
+      return { room, who };
     });
-    return response({ ok: true });
+    return response({
+      ok: true,
+      room: publicRoom(
+        updated.room,
+        updated.who.host,
+        updated.who.playerId,
+        Date.now(),
+      ),
+    });
   } catch (e) {
     return failure(e);
   }

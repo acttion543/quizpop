@@ -8,7 +8,6 @@ import {
   ChevronDown,
   Clock,
   Copy,
-  Download,
   Gamepad2,
   HelpCircle,
   Home,
@@ -37,13 +36,17 @@ import {
   validateQuestions,
 } from "@/lib/engine";
 import { AuthPortal } from "@/components/auth-portal";
+import { AnswerPanel } from "@/components/answer-panel";
+import { GameResults } from "@/components/game-results";
+import { shouldAcceptSnapshot } from "@/lib/room-snapshot";
 import { authFetch } from "@/lib/firebase-client";
 import type { PublicRoom, Question, Quiz, Room } from "@/lib/types";
-async function api(data: Record<string, unknown>) {
+async function api(data: Record<string, unknown>, signal?: AbortSignal) {
   const r = await authFetch("/api/game", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
+    signal,
   });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || "ทำรายการไม่สำเร็จ");
@@ -1208,15 +1211,25 @@ function GameScreen({
   const [nameError, setNameError] = useState("");
   const closeRename = useCallback(() => setRenameOpen(false), []);
   const refresh = useRef<() => Promise<void>>(async () => {});
+  const roomRequestVersion = useRef(0);
+  const latestRoom = useRef<PublicRoom | null>(null);
+  const acceptRoom = useCallback((snapshot: PublicRoom) => {
+    if (!shouldAcceptSnapshot(snapshot, latestRoom.current)) return;
+    latestRoom.current = snapshot;
+    setRoom(snapshot);
+    setOffset(snapshot.serverNow - Date.now());
+    setError("");
+  }, []);
   const closeEnd = useCallback(() => setConfirmEnd(false), []);
   useEffect(() => {
     if (solo) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
-    let requestVersion = 0;
+    latestRoom.current = null;
+    setRoom(null);
     const load = async () => {
-      const version = ++requestVersion;
+      const version = ++roomRequestVersion.current;
       try {
         const res = await authFetch(
           `/api/game?pin=${route?.pin}&role=${route?.role}`,
@@ -1224,20 +1237,17 @@ function GameScreen({
         );
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || "เชื่อมต่อไม่ได้");
-        if (!stopped && version === requestVersion) {
-          setRoom(d);
-          setOffset(d.serverNow - Date.now());
-          setError("");
-        }
+        if (!stopped && version === roomRequestVersion.current) acceptRoom(d);
       } catch (e) {
-        if (!stopped && version === requestVersion)
+        if (!stopped && version === roomRequestVersion.current)
           setError((e as Error).message);
       }
     };
     refresh.current = load;
     const poll = async () => {
       if (!document.hidden) await load();
-      if (!stopped) timer = setTimeout(poll, 1500);
+      if (!stopped && latestRoom.current?.phase !== "finished")
+        timer = setTimeout(poll, 1500);
     };
     void poll();
     return () => {
@@ -1245,11 +1255,13 @@ function GameScreen({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [route?.pin, route?.role, solo]);
+  }, [route?.pin, route?.role, solo, acceptRoom]);
   useEffect(() => {
+    if ((solo?.phase || room?.phase) !== "question") return;
+    setTime(Date.now());
     const id = setInterval(() => setTime(Date.now()), 100);
     return () => clearInterval(id);
-  }, []);
+  }, [solo?.phase, room?.phase]);
   useEffect(() => {
     if (
       solo?.phase === "question" &&
@@ -1276,7 +1288,7 @@ function GameScreen({
         else if (action === "end") n.phase = "finished";
         setSolo(n);
       } else {
-        await api({
+        const result = await api({
           action,
           pin: route?.pin,
           role: route?.role,
@@ -1284,7 +1296,10 @@ function GameScreen({
           phase: current?.phase,
           ...extra,
         });
-        if (action !== "leave") await refresh.current();
+        if (result.room) {
+          roomRequestVersion.current++;
+          acceptRoom(result.room);
+        } else if (action !== "leave") await refresh.current();
       }
       return true;
     } catch (e) {
@@ -1293,6 +1308,24 @@ function GameScreen({
     } finally {
       setBusy(false);
     }
+  }
+  async function submitChoice(choice: number, signal: AbortSignal) {
+    if (!current) throw new Error("ไม่พบคำถาม");
+    const index = current.index;
+    if (solo) {
+      const next = structuredClone(solo);
+      submitAnswer(next, "me", choice, index, Date.now());
+      setSolo(next);
+      return;
+    }
+    const result = await api(
+      { action: "answer", pin: route?.pin, role: route?.role, index, choice },
+      signal,
+    );
+    if (result.room) {
+      roomRequestVersion.current++;
+      acceptRoom(result.room);
+    } else await refresh.current();
   }
   async function leave() {
     if (await action("leave")) onHome();
@@ -1506,69 +1539,13 @@ function GameScreen({
           )}
         </main>
       ) : current.phase === "finished" ? (
-        <main className="results">
-          <div className="result-confetti" aria-hidden="true">
-            ✦ · ✧ · ✦
-          </div>
-          <span className="result-trophy">🏆</span>
-          <span className="eyebrow">THAT WAS AWESOME!</span>
-          <h1>{solo ? "เก่งมาก เล่นจบแล้ว!" : "แชมป์ของเกมนี้คือ..."}</h1>
-          <p>
-            {current.title} · {current.total} คำถาม
-          </p>
-          <div className="podium">
-            {[1, 0, 2]
-              .filter((i) => current.players[i])
-              .map((i) => (
-                <div
-                  className={"podium-player rank-" + i}
-                  key={current.players[i].id}
-                >
-                  <span className="podium-avatar">
-                    {current.players[i].avatar}
-                  </span>
-                  <strong>{current.players[i].name}</strong>
-                  <span>{current.players[i].score.toLocaleString()} คะแนน</span>
-                  <div className="podium-block">
-                    {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}
-                    <b>{i + 1}</b>
-                  </div>
-                </div>
-              ))}
-          </div>
-          <div className="results-table">
-            <h2>กระดานคะแนน</h2>
-            {current.players.map((p, i) => (
-              <div
-                className={p.id === current.playerId ? "my-row" : ""}
-                key={p.id}
-              >
-                <span className="rank-number">{i + 1}</span>
-                <span className="score-avatar">{p.avatar}</span>
-                <strong>
-                  {p.name}
-                  {p.id === current.playerId && <small>คุณ</small>}
-                </strong>
-                <b>
-                  {p.score.toLocaleString()}
-                  <small>คะแนน</small>
-                </b>
-              </div>
-            ))}
-          </div>
-          <div className="results-actions">
-            <button className="button primary" onClick={onHome}>
-              <Home size={18} />
-              เลือกควิซใหม่
-            </button>
-            {control && (
-              <button className="button white" onClick={exportScores}>
-                <Download size={18} />
-                ดาวน์โหลดคะแนน
-              </button>
-            )}
-          </div>
-        </main>
+        <GameResults
+          room={current}
+          solo={!!solo}
+          canExport={control}
+          onHome={onHome}
+          onExport={exportScores}
+        />
       ) : (
         <main className="play-area">
           <div className="play-topline">
@@ -1602,50 +1579,14 @@ function GameScreen({
               ✦
             </span>
           </div>
-          {current.phase === "question" && current.hasAnswered && !isHost ? (
-            <div className="answer-submitted">
-              <span>🙌</span>
-              <h2>ส่งคำตอบแล้ว!</h2>
-              <p>รอลุ้นคะแนนพร้อมเพื่อน ๆ หลังเฉลย</p>
-              <LoaderCircle className="spin" size={24} />
-            </div>
-          ) : (
-            <div className={"answer-grid " + (revealed ? "revealed" : "")}>
-              {q?.options.map((o, i) => (
-                <button
-                  key={i}
-                  disabled={
-                    revealed ||
-                    isHost ||
-                    busy ||
-                    current.hasAnswered ||
-                    remaining === 0
-                  }
-                  className={
-                    "answer-tile choice-" +
-                    i +
-                    (revealed && q.correct === i ? " correct" : "") +
-                    (revealed && q.correct !== i ? " incorrect" : "")
-                  }
-                  onClick={() => action("answer", { choice: i })}
-                >
-                  <span className="answer-shape">{shapes[i]}</span>
-                  <strong>
-                    <span className="option-letter">
-                      {String.fromCharCode(65 + i)}.
-                    </span>
-                    {o}
-                  </strong>
-                  {revealed && (
-                    <span className="answer-count">
-                      {current.distribution[i]} คน{" "}
-                      {q.correct === i && <CheckCircle2 size={25} />}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+          <AnswerPanel
+            key={current.pin + ":" + current.index}
+            room={current}
+            remaining={remaining}
+            disabled={busy}
+            onSubmit={submitChoice}
+            onRefresh={() => refresh.current()}
+          />
           {revealed && (
             <div className="reveal-bottom">
               {!isHost && (

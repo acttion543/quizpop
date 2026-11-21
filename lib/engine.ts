@@ -168,6 +168,7 @@ export function publicRoom(
   if (visible) Object.values(answers).forEach((a) => distribution[a.choice]++);
   return {
     pin: room.pin,
+    revision: room.revision || 0,
     title: room.title,
     phase: room.phase,
     index: room.index,
@@ -197,6 +198,7 @@ export function publicRoom(
     isHost,
     playerId,
     myAnswer: visible && own ? own : null,
+    myChoice: own?.choice ?? null,
     hasAnswered: !!own,
   };
 }
