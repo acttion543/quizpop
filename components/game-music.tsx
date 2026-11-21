@@ -1,107 +1,127 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Music2, Volume2, VolumeX } from "lucide-react";
-import { QuizMusic } from "@/lib/quiz-music";
+import { QuizMusic, type MusicPlayback } from "@/lib/quiz-music";
+import { DEFAULT_MUSIC_VOLUME, MUSIC_PREFERENCE_KEY, readMusicPreferences } from "@/lib/music-preferences";
 import type { Room } from "@/lib/types";
 
 export function GameMusic({ phase, remaining }: { phase: Room["phase"]; remaining: number }) {
+  const audio = useRef<HTMLAudioElement>(null);
   const engine = useRef<QuizMusic | null>(null);
-  const desired = useRef(false);
-  const [enabled, setEnabled] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
-  const [volume, setVolume] = useState(22);
-  const [error, setError] = useState("");
-  const [visible, setVisible] = useState(true);
+  const desired = useRef(true);
+  const hardwareVolume = useRef(false);
+  const level = useRef(DEFAULT_MUSIC_VOLUME);
+  const [enabled, setEnabled] = useState(true);
+  const [playback, setPlayback] = useState<MusicPlayback>("starting");
+  const [volume, setVolume] = useState(DEFAULT_MUSIC_VOLUME);
+  const [ios, setIos] = useState(false);
+
+  function save(nextEnabled: boolean, nextVolume: number) {
+    try { localStorage.setItem(MUSIC_PREFERENCE_KEY, JSON.stringify({ enabled: nextEnabled, volume: nextVolume })); } catch {}
+  }
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("quizpop:music") || "null");
-      if (saved) {
-        desired.current = saved.enabled === true;
-        setEnabled(desired.current);
-        if (typeof saved.volume === "number") setVolume(Math.max(0, Math.min(100, saved.volume)));
-      }
-    } catch {}
-    const visibility = () => setVisible(!document.hidden);
-    visibility();
-    document.addEventListener("visibilitychange", visibility);
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(MUSIC_PREFERENCE_KEY); } catch {}
+    const saved = readMusicPreferences(raw);
+    desired.current = saved.enabled;
+    level.current = saved.volume;
+    setEnabled(saved.enabled);
+    setVolume(saved.volume);
+    hardwareVolume.current = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    setIos(hardwareVolume.current);
+    if (!audio.current) return;
+    const music = new QuizMusic(audio.current, setPlayback);
+    engine.current = music;
+    music.setVolume(hardwareVolume.current ? 1 : saved.volume / 100);
+    if (saved.enabled) void music.play();
+    else music.pause();
+
+    const activate = (event: Event) => {
+      if ((event.target as Element | null)?.closest?.("[data-music-control]")) return;
+      if (desired.current && !music.playing) void music.play();
+    };
+    const resume = () => {
+      if (!document.hidden && desired.current && !music.playing) void music.play();
+    };
+    // iOS recognizes click/touchend for starting media. A pointerdown alone is insufficient.
+    document.addEventListener("click", activate);
+    document.addEventListener("touchend", activate, { passive: true });
+    document.addEventListener("keydown", activate);
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("pageshow", resume);
     return () => {
-      document.removeEventListener("visibilitychange", visibility);
-      if (engine.current) {
-        engine.current.context.onstatechange = null;
-        engine.current.dispose();
-        engine.current = null;
-      }
+      document.removeEventListener("click", activate);
+      document.removeEventListener("touchend", activate);
+      document.removeEventListener("keydown", activate);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("pageshow", resume);
+      music.dispose();
+      engine.current = null;
     };
   }, []);
-  function save(nextEnabled: boolean, nextVolume: number) {
-    try { localStorage.setItem("quizpop:music", JSON.stringify({ enabled: nextEnabled, volume: nextVolume })); } catch {}
-  }
-  async function unlock() {
-    setError("");
-    try {
-      if (!engine.current) {
-        const Audio = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (!Audio) throw new Error("Audio unavailable");
-        engine.current = new QuizMusic(new Audio());
-        engine.current.context.onstatechange = () => setUnlocked(engine.current?.context.state === "running");
-      }
-      const ready = await engine.current.unlock();
-      if (desired.current) setUnlocked(ready);
-    } catch { setError("เปิดเพลงไม่ได้ ลองแตะปุ่มอีกครั้ง"); }
-  }
-  // A remembered preference can resume on the next real gesture (including host Start).
   useEffect(() => {
-    if (!enabled || unlocked) return;
-    const activate = () => { if (desired.current) void unlock(); };
-    document.addEventListener("pointerdown", activate);
-    document.addEventListener("keydown", activate);
-    return () => {
-      document.removeEventListener("pointerdown", activate);
-      document.removeEventListener("keydown", activate);
-    };
-  }, [enabled, unlocked]);
-  useEffect(() => {
-    const music = engine.current;
-    if (!music) return;
-    music.setVolume(volume / 100);
-    music.setUrgent(remaining <= 5);
-    if (enabled && unlocked && visible && phase === "question" && remaining > 0) music.play();
-    else music.pause();
-  }, [phase, remaining, enabled, unlocked, visible, volume]);
-  async function toggle() {
-    if (enabled && unlocked) {
+    // Keep the same audio element playing through lobby, questions, reveal and results.
+    // Only the user or the browser/OS can pause it while this room is mounted.
+    engine.current?.setUrgent(phase === "question" && remaining > 0 && remaining <= 5);
+  }, [phase, remaining]);
+
+  function start() {
+    desired.current = true;
+    setEnabled(true);
+    const nextVolume = level.current === 0 ? DEFAULT_MUSIC_VOLUME : level.current;
+    level.current = nextVolume;
+    setVolume(nextVolume);
+    save(true, nextVolume);
+    engine.current?.setVolume(hardwareVolume.current ? 1 : nextVolume / 100);
+    void engine.current?.play();
+  }
+  function toggle() {
+    if (desired.current) {
       desired.current = false;
       setEnabled(false);
+      save(false, level.current);
       engine.current?.pause();
-      save(false, volume);
-    } else {
-      desired.current = true;
-      setEnabled(true);
-      save(true, volume);
-      await unlock();
-    }
+    } else start();
   }
-  const on = enabled && unlocked;
+  function changeVolume(value: number) {
+    level.current = value;
+    setVolume(value);
+    save(desired.current, value);
+    engine.current?.setVolume(value / 100);
+  }
+  const playing = enabled && playback === "playing";
   return (
-    <div className="game-music">
-      <button type="button" className={"music-toggle " + (on ? "on" : "")} aria-pressed={on}
-        aria-label={on ? "ปิดเพลงคลอ" : "เปิดเพลงคลอ"} onClick={() => void toggle()}
-        title={on ? "เพลงจะหยุดตอนเฉลยและจบเกม" : "แตะเพื่อเปิดเพลงคลอระหว่างตอบคำถาม"}>
-        {on ? <Volume2 size={17} /> : <VolumeX size={17} />}
-        <span>{on ? "เพลงเปิดอยู่" : "เปิดเพลง"}</span>
-        {on && phase === "question" && remaining > 0 && visible && <i className="music-bars" aria-hidden="true"><b /><b /><b /></i>}
+    <div className="game-music" data-music-control>
+      <audio ref={audio} src="/audio/quizpop-suspense-v2.wav" loop preload="auto" aria-hidden="true" />
+      <button type="button" className={"music-toggle " + (enabled ? "on" : "")} aria-pressed={enabled}
+        aria-label={enabled ? "ปิดเพลงคลอ" : "เปิดเพลงคลอ"} onClick={toggle}
+        title={enabled ? "เปิดเสียงต่อเนื่องจนกว่าคุณจะกดปิด" : "เปิดเพลงคลอ"}>
+        {enabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
+        <span>{enabled ? (playing ? "เพลงเปิดอยู่" : "เสียงเปิด") : "เปิดเพลง"}</span>
+        {playing && <i className="music-bars" aria-hidden="true"><b /><b /><b /></i>}
       </button>
       <details className="music-settings">
         <summary aria-label="ปรับระดับเสียงเพลง" title="ปรับระดับเสียงเพลง"><Music2 size={16} /></summary>
         <div className="music-volume">
-          <label>ระดับเสียง <strong>{volume}%</strong>
-            <input aria-label="ระดับเสียงเพลง" type="range" min="0" max="100" value={volume}
-              onChange={(e) => { const v = Number(e.target.value); setVolume(v); save(enabled, v); }} />
-          </label>
-          <small>{error || "เพลงคลอลุ้น ๆ · เร่งจังหวะช่วง 5 วิ��าทีสุดท้าย"}</small>
+          {ios ? <p>ปรับความดังด้วยปุ่มเพิ่ม–ลดเสียงของ iPhone / iPad</p> : (
+            <label>ระดับเสียง <strong>{volume}%</strong>
+              <input aria-label="ระดับเสียงเพลง" type="range" min="0" max="100" value={volume}
+                onChange={(e) => changeVolume(Number(e.target.value))} />
+            </label>
+          )}
+          <small>เพลงเล่นต่อเนื่อง · เร่งจังหวะช่วง 5 วินาทีสุดท้าย</small>
+          <button className="music-retry" type="button" onClick={start}>เริ่มเพลงอีกครั้ง</button>
         </div>
       </details>
-      {error && <span className="sr-only" role="status">{error}</span>}
+      {enabled && !playing && (
+        <div className="music-notice" role="status">
+          <span>{playback === "error" ? "โหลดเพลงไม่สำเร็จ ลองอีกครั้งได้เลย" :
+            playback === "starting" ? "กำลังเตรียมเพลง หากยังไม่ดังให้แตะเริ่มเพลง" :
+            "เบราว์เซอร์รอให้คุณแตะเพื่อเริ่มเสียง"}</span>
+          <button type="button" onClick={start}>แตะเริ่มเพลง</button>
+        </div>
+      )}
     </div>
   );
 }

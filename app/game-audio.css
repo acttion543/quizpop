@@ -33,3 +33,9 @@
   .music-settings summary { padding:9px 5px; }
 }
 @media(prefers-reduced-motion:reduce) { .music-bars b { animation:none; } }
+
+.game-music > audio { display:none; }
+.music-volume p { margin:0 0 10px; line-height:1.8; }
+.music-retry { width:100%; margin-top:10px; border-radius:8px; padding:10px; background:#f2ebff; color:#65369f; font-size:11px; }
+.music-notice { position:absolute; right:0; top:48px; width:260px; max-width:80vw; z-index:25; padding:14px; border:1px solid #dccdf0; border-radius:12px; background:#fff; color:#715e82; box-shadow:0 10px 24px #34204422; font-size:11px; line-height:1.7; }
+.music-notice button { display:block; width:100%; margin-top:9px; min-height:42px; border-radius:8px; background:#7645b5; color:white; font-size:12px; font-weight:650; }
