@@ -15,7 +15,7 @@
         "Housework"
       ],
       "correct": 1,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "In the phrase “funny little games,” what does the word “funny” suggest?",
@@ -26,7 +26,7 @@
         "Something educational"
       ],
       "correct": 2,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "What does the word “catch” mean in the sentence “How can they catch me now?”",
@@ -37,7 +37,7 @@
         "To find something lost"
       ],
       "correct": 1,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "In the greeting “Dear Boss,” what does the word “Boss” refer to?",
@@ -48,13 +48,18 @@
         "A police officer"
       ],
       "correct": 2,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "What is the synonym of “catch” used in the presentation?",
-      "options": ["Escape", "Capture", "Release", "Hide"],
+      "options": [
+        "Escape",
+        "Capture",
+        "Release",
+        "Hide"
+      ],
       "correct": 1,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "In the letter, what does “Good luck” communicate in context?",
@@ -65,7 +70,7 @@
         "An apology"
       ],
       "correct": 2,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "Which pair shows opposite meanings in the context of the letter?",
@@ -76,13 +81,18 @@
         "Lady – Woman"
       ],
       "correct": 1,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "What is the broader category of the word “knife”?",
-      "options": ["Furniture", "Clothing", "Weapon", "Food"],
+      "options": [
+        "Furniture",
+        "Clothing",
+        "Weapon",
+        "Food"
+      ],
       "correct": 2,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "What does the phrase “keep this letter back” mean?",
@@ -93,7 +103,7 @@
         "Destroy the letter"
       ],
       "correct": 1,
-      "seconds": 30
+      "seconds": 20
     },
     {
       "text": "Why is the word “work” interesting in the letter?",
@@ -104,7 +114,7 @@
         "It refers to helping the police"
       ],
       "correct": 2,
-      "seconds": 30
+      "seconds": 20
     }
   ]
 }

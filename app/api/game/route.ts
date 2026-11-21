@@ -23,23 +23,10 @@ import {
 import { requireUser, requireAdmin } from "@/lib/auth-server";
 import { avatars, quizzes } from "@/lib/quizzes";
 import type { Room } from "@/lib/types";
-import type { DecodedIdToken } from "firebase-admin/auth";
+import { pinCheck, roomIdentity as identity } from "@/lib/room-access";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const hash = (v: string) => createHash("sha256").update(v).digest("hex");
-function pinCheck(pin: unknown): asserts pin is string {
-  if (typeof pin !== "string" || !/^\d{6}$/.test(pin))
-    throw new GameError("กรอกรหัสห้อง 6 หลัก");
-}
-function identity(room: Room, user: DecodedIdToken, role: string | null) {
-  if (role === "host") {
-    requireAdmin(user);
-    if (room.hostUid === user.uid) return { host: true, playerId: null };
-  }
-  if (role !== "host" && room.players[user.uid])
-    return { host: false, playerId: user.uid };
-  throw new GameError("ไม่มีสิทธิ์เข้าห้องนี้ กรุณาเข้าร่วมใหม่", 403);
-}
 function response(d: unknown) {
   return NextResponse.json(d, { headers: { "Cache-Control": "no-store" } });
 }

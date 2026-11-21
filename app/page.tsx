@@ -38,6 +38,8 @@ import {
 import { AuthPortal } from "@/components/auth-portal";
 import { AnswerPanel } from "@/components/answer-panel";
 import { GameResults } from "@/components/game-results";
+import { GameMusic } from "@/components/game-music";
+import { readRoomEvents } from "@/lib/read-room-events";
 import { shouldAcceptSnapshot } from "@/lib/room-snapshot";
 import { authFetch } from "@/lib/firebase-client";
 import type { PublicRoom, Question, Quiz, Room } from "@/lib/types";
@@ -1225,6 +1227,11 @@ function GameScreen({
     if (solo) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
+    let reconnect: ReturnType<typeof setTimeout>;
+    let liveController: AbortController | null = null;
+    let connecting = false;
+    let live = false;
+    let lastActivity = 0;
     const controller = new AbortController();
     latestRoom.current = null;
     setRoom(null);
@@ -1239,21 +1246,63 @@ function GameScreen({
         if (!res.ok) throw new Error(d.error || "เชื่อมต่อไม่ได้");
         if (!stopped && version === roomRequestVersion.current) acceptRoom(d);
       } catch (e) {
-        if (!stopped && version === roomRequestVersion.current)
+        if (!stopped && !live && version === roomRequestVersion.current)
           setError((e as Error).message);
       }
     };
     refresh.current = load;
+    const gameFinished = () => latestRoom.current?.phase === "finished";
+    const connect = async () => {
+      if (stopped || connecting || document.hidden || gameFinished()) return;
+      clearTimeout(reconnect);
+      connecting = true;
+      liveController = new AbortController();
+      try {
+        const res = await authFetch(
+          `/api/game/events?pin=${route?.pin}&role=${route?.role}`,
+          { cache: "no-store", signal: liveController.signal },
+        );
+        if (!res.ok) throw new Error("Live connection unavailable");
+        await readRoomEvents(res, (snapshot) => {
+          if (stopped) return false;
+          acceptRoom(snapshot);
+          return snapshot.phase !== "finished";
+        }, () => { live = true; lastActivity = Date.now(); });
+      } catch {
+        // The normal authenticated GET below keeps the game usable when SSE is unavailable.
+      } finally {
+        live = false;
+        connecting = false;
+        if (!stopped && !document.hidden && !gameFinished())
+          reconnect = setTimeout(() => void connect(), 1000);
+      }
+    };
     const poll = async () => {
-      if (!document.hidden) await load();
+      if (live && Date.now() - lastActivity > 25000) {
+        live = false;
+        liveController?.abort();
+      }
+      if (!document.hidden && !live) await load();
       if (!stopped && latestRoom.current?.phase !== "finished")
         timer = setTimeout(poll, 1500);
     };
+    const visibility = () => {
+      if (document.hidden) liveController?.abort();
+      else {
+        void load();
+        void connect();
+      }
+    };
+    document.addEventListener("visibilitychange", visibility);
     void poll();
+    void connect();
     return () => {
       stopped = true;
       clearTimeout(timer);
+      clearTimeout(reconnect);
       controller.abort();
+      liveController?.abort();
+      document.removeEventListener("visibilitychange", visibility);
     };
   }, [route?.pin, route?.role, solo, acceptRoom]);
   useEffect(() => {
@@ -1269,6 +1318,13 @@ function GameScreen({
     )
       setSolo((v) => (v ? settle(structuredClone(v), Date.now()) : v));
   }, [time, solo, setSolo]);
+  useEffect(() => {
+    if (solo || room?.phase !== "question") return;
+    // Refresh exactly at zero as a fallback if a streaming connection is interrupted.
+    const timer = setTimeout(() => void refresh.current(),
+      Math.max(0, room.deadline - (Date.now() + offset) + 10));
+    return () => clearTimeout(timer);
+  }, [solo, room?.index, room?.phase, room?.deadline, offset]);
   const current = solo
     ? publicRoom(structuredClone(solo), false, "me", time)
     : room;
@@ -1421,6 +1477,8 @@ function GameScreen({
           </span>
           <span>{current.title}</span>
         </div>
+        <div className="game-header-actions">
+          <GameMusic phase={current.phase} remaining={remaining} />
         <button
           className="icon-button"
           disabled={busy}
@@ -1434,6 +1492,7 @@ function GameScreen({
         >
           <LogOut size={21} />
         </button>
+        </div>
       </header>
       {error && (
         <div className="game-error" role="alert">

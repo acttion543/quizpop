@@ -1,0 +1,35 @@
+.game-header-actions { display:flex; align-items:center; gap:12px; flex-shrink:0; }
+.game-shell .game-header-center { min-width:0; }
+.game-shell .game-header-center > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.game-music { display:flex; align-items:center; gap:3px; position:relative; }
+.music-toggle {
+  display:flex; align-items:center; gap:7px; min-height:38px; padding:8px 12px;
+  border:1px solid #e1d8f0; border-radius:99px; color:#796689; background:#fff;
+  font-size:11px; font-weight:650; white-space:nowrap;
+}
+.music-toggle.on { background:#f2ebff; border-color:#d4bdf7; color:#6938ac; }
+.music-settings summary { display:flex; padding:9px 7px; cursor:pointer; color:#8a749c; list-style:none; }
+.music-settings summary::-webkit-details-marker { display:none; }
+.music-volume {
+  position:absolute; right:0; top:48px; width:230px; padding:16px; z-index:30;
+  background:white; border:1px solid #e6dcf2; border-radius:14px; box-shadow:0 12px 30px #34204422;
+  color:#685077; font-size:12px; line-height:1.7;
+}
+.music-volume label { display:block; }
+.music-volume strong { float:right; }
+.music-volume input { width:100%; display:block; margin:12px 0; accent-color:#7b4ac4; }
+.music-volume small { font-size:10px; color:#9985a7; }
+.music-bars { display:flex; align-items:center; gap:2px; height:15px; }
+.music-bars b { width:2px; height:11px; background:currentColor; animation:music-beat .65s ease-in-out infinite alternate; }
+.music-bars b:nth-child(2) { animation-delay:.2s; height:6px; }
+.music-bars b:nth-child(3) { animation-delay:.4s; height:14px; }
+@keyframes music-beat { to { transform:scaleY(.35); } }
+@media(max-width:850px) { .game-shell .game-header-center { display:none; } }
+@media(max-width:600px) {
+  .game-shell .game-header { padding:16px; }
+  .game-shell .game-header .brand { font-size:22px; flex-shrink:0; }
+  .game-header-actions { gap:5px; }
+  .music-toggle { padding:8px 9px; font-size:10px; }
+  .music-settings summary { padding:9px 5px; }
+}
+@media(prefers-reduced-motion:reduce) { .music-bars b { animation:none; } }

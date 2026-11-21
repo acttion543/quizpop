@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./game-ux.css";
 import "./login-help.css";
+import "./game-audio.css";
 export const metadata: Metadata = {
   title: "QuizPop! — เล่น เรียนรู้ ลุ้นไปด้วยกัน",
   description: "เปลี่ยนทุกคำถามเป็นความสนุก สร้างห้องควิซ ชวนเพื่อน และแข่งกันแบบสด ๆ",
