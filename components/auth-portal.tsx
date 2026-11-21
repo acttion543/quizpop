@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { getRedirectResult, onAuthStateChanged, type User } from "firebase/auth";
+import { LoginBrowserHelp } from "@/components/login-browser-help";
+import { embeddedBrowserName, loginErrorMessage } from "@/lib/login-support";
 import {
   ArrowUpRight,
   CheckCircle2,
@@ -17,6 +19,7 @@ import {
   authConfigured,
   authFetch,
   clientAuth,
+  canRedirectLogin,
   googleLogin,
   logout,
 } from "@/lib/firebase-client";
@@ -53,46 +56,54 @@ export function AuthPortal({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const [adminPath, setAdminPath] = useState(false);
+  const [browserName, setBrowserName] = useState<string | null>(null);
   useEffect(() => {
     setAdminPath(location.pathname === "/admin");
+    setBrowserName(embeddedBrowserName(navigator.userAgent));
     if (!authConfigured()) {
       setLoading(false);
       return;
     }
-    return onAuthStateChanged(clientAuth(), async (u) => {
-      setLoading(true);
-      setError("");
-      setUser(u);
-      setAdmin(false);
-      if (u) {
-        try {
-          const r = await authFetch("/api/account");
-          const d = await r.json();
-          if (!r.ok) throw new Error(d.error);
-          setAdmin(d.admin);
-        } catch (e) {
-          setError((e as Error).message);
-        }
+    let disposed = false;
+    let unsubscribe = () => {};
+    async function observeAuth() {
+      try {
+        await getRedirectResult(clientAuth());
+      } catch (e) {
+        if (!disposed) setError(loginErrorMessage(e));
       }
-      setLoading(false);
-    });
+      if (disposed) return;
+      unsubscribe = onAuthStateChanged(clientAuth(), async (u) => {
+        setLoading(true);
+        if (u) setError("");
+        setUser(u);
+        setAdmin(false);
+        if (u) {
+          try {
+            const r = await authFetch("/api/account");
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error);
+            if (!disposed) setAdmin(d.admin);
+          } catch (e) {
+            if (!disposed) setError((e as Error).message);
+          }
+        }
+        if (!disposed) setLoading(false);
+      });
+    }
+    void observeAuth();
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
   }, []);
-  async function login() {
+  async function login(mode?: "redirect") {
     setBusy(true);
     setError("");
     try {
-      await googleLogin();
+      await googleLogin(mode);
     } catch (e) {
-      const code = (e as { code?: string }).code;
-      setError(
-        code === "auth/popup-closed-by-user"
-          ? "ปิดหน้าต่างเข้าสู่ระบบแล้ว ลองอีกครั้งได้เลย"
-          : code === "auth/unauthorized-domain"
-            ? "โดเมนนี้ยังไม่ได้รับอนุญาตใน Firebase กรุณาติดต่อผู้ดูแลระบบ"
-            : code === "auth/popup-blocked"
-              ? "เบราว์เซอร์บล็อกหน้าต่าง Google กรุณาอนุญาตป๊อปอัปแล้วลองอีกครั้ง"
-              : (e as Error).message,
-      );
+      setError(loginErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -167,7 +178,7 @@ export function AuthPortal({
                 ? "เข้าสู่ระบบเพื่อสร้างคำถามและจัดการห้องสอบ"
                 : "เข้าสู่ระบบ แล้วเข้าห้องรอเพื่อน ๆ กัน"}
             </p>
-            <button className="google-button" disabled={busy} onClick={login}>
+            <button className="google-button" disabled={busy || !!browserName} onClick={() => void login()}>
               {busy ? (
                 <LoaderCircle className="spin" size={22} />
               ) : (
@@ -195,13 +206,19 @@ export function AuthPortal({
                   />
                 </svg>
               )}
-              เข้าสู่ระบบด้วย Google
+              {browserName ? "เปิดใน Safari / Chrome เพื่อเข้าสู่ระบบ" : "เข้าสู่ระบบด้วย Google"}
             </button>
             {error && (
               <p className="error" role="alert">
                 {error}
               </p>
             )}
+            {error && !browserName && canRedirectLogin() && (
+              <button className="login-redirect-button" disabled={busy} onClick={() => void login("redirect")}>
+                เข้าสู่ระบบในแท็บนี้
+              </button>
+            )}
+            <LoginBrowserHelp browserName={browserName} expanded={!!error} />
             <div className="login-divider">
               <span>เชื่อมต่อด้วยบัญชีของคุณ</span>
             </div>

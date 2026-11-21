@@ -13,7 +13,8 @@
         "oAuthBrandDisplayName": "QuizPop",
         "supportEmail": "acttion543@gmail.com",
         "authorizedRedirectUris": [
-          "https://quizpop-543-261121.firebaseapp.com/__/auth/handler"
+          "https://quizpop-543-261121.firebaseapp.com/__/auth/handler",
+          "https://quizpop-sandy.vercel.app/__/auth/handler"
         ]
       }
     }

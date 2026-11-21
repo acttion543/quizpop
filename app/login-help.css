@@ -1,0 +1,55 @@
+.login-browser-help {
+  margin-top: 20px;
+  border: 1px solid #e3dcf2;
+  border-radius: 12px;
+  background: #faf8ff;
+  color: #56466c;
+  font-size: 12px;
+}
+.login-browser-help summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  cursor: pointer;
+  font-weight: 650;
+}
+.login-browser-help summary::after { content: "+"; margin-left: auto; font-size: 18px; }
+.login-browser-help[open] summary::after { content: "−"; }
+.login-browser-help-content { padding: 0 14px 12px; line-height: 1.8; }
+.login-browser-help-content p { margin: 8px 0; }
+.login-browser-help-content label { display: block; font-size: 11px; margin-bottom: 5px; }
+.login-copy-link { display: flex; gap: 6px; min-width: 0; }
+.login-copy-link input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #ddd4ea;
+  border-radius: 7px;
+  background: white;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: #49375d;
+}
+.login-copy-link button {
+  flex-shrink: 0;
+  border: 1px solid #d5c6ec;
+  border-radius: 7px;
+  background: #ede5fc;
+  color: #59328c;
+  gap: 5px;
+  padding: 8px;
+  font-size: 12px;
+}
+.login-copy-status { font-size: 11px; color: #5e457d; }
+.login-copy-status:empty { display: none; }
+.login-redirect-button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #cab5e8;
+  border-radius: 10px;
+  background: #f3edff;
+  color: #5b3092;
+  font-weight: 600;
+}
+.google-button:disabled { opacity: .65; cursor: default; }

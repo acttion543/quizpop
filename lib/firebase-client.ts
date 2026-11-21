@@ -3,8 +3,11 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from "firebase/auth";
+import { embeddedBrowserName, shouldUseRedirectLogin } from "./login-support";
+
 export function authConfigured() {
   return !!(
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
@@ -27,9 +30,31 @@ export function clientAuth() {
     });
   return getAuth(app);
 }
-export async function googleLogin() {
+export function canRedirectLogin() {
+  return typeof location !== "undefined" &&
+    location.hostname === process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+}
+export async function googleLogin(mode?: "redirect") {
+  if (embeddedBrowserName(navigator.userAgent)) {
+    throw Object.assign(new Error("Open in your browser"), { code: "auth/embedded-browser" });
+  }
+  const redirect = mode === "redirect" || shouldUseRedirectLogin(
+    navigator.userAgent, navigator.maxTouchPoints,
+    location.hostname, process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  );
+  if (redirect) {
+    if (!canRedirectLogin()) throw Object.assign(new Error("Same-origin auth required"), { code: "auth/unauthorized-domain" });
+    try {
+      const key = "quizpop:storage-check";
+      sessionStorage.setItem(key, "1");
+      sessionStorage.removeItem(key);
+    } catch {
+      throw Object.assign(new Error("Session storage unavailable"), { code: "auth/web-storage-unsupported" });
+    }
+  }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
+  if (redirect) return signInWithRedirect(clientAuth(), provider);
   return signInWithPopup(clientAuth(), provider);
 }
 export async function logout() {

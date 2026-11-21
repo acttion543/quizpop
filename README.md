@@ -63,6 +63,34 @@ npm run seed:dear-boss
 
 หน้ารอสอบดึงข้อมูลทุก 4 วินาที หน้าห้องเกมดึงทุก 1.5 วินาที จึงอาจมีระยะอัปเดตสั้น ๆ ต่างกันระหว่างเครื่อง เวลาตอบจริงและคะแนนยึดเซิร์ฟเวอร์เดียวกัน
 
+## Google Login บน Safari / iPad และลิงก์จาก LINE
+
+Production ใช้ NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=quizpop-sandy.vercel.app และ reverse proxy
+/__/auth/:path* ไปยัง quizpop-543-261121.firebaseapp.com ผ่าน next.config.ts
+เพื่อให้หน้าเว็บและ Firebase helper ใช้ storage บน origin เดียวกัน ตาม
+[Firebase redirect best practices — Option 3](https://firebase.google.com/docs/auth/web/redirect-best-practices#option-3-proxy-auth-requests-to-firebaseappcom)
+
+มือถือ รวมถึง iPad ที่ใช้ desktop user agent จะใช้ signInWithRedirect เมื่อ authDomain ตรงกับ hostname เท่านั้น
+ส่วน desktop ใช้ popup และมีปุ่มใช้แท็บเดิมเมื่อเกิดข้อผิดพลาด
+getRedirectResult ทำงานก่อนเริ่มตรวจบัญชี จึงรับผลหลังกลับจาก Google ได้โดยคง URL เดิมและ PIN เชิญไว้
+
+หากตรวจพบ user agent ของ LINE / Facebook / Instagram จะแนะนำเปิด Safari หรือ Chrome
+พร้อมลิงก์คัดลอกที่เก็บเส้นทาง /admin และ PIN โดยตัด OAuth query/hash ออก
+การตรวจ user agent ใช้เพื่อแสดง UI เท่านั้น การตรวจสิทธิ์ยังยึด Firebase token ที่ server
+
+เมื่อเปลี่ยนโดเมน production ต้องทำให้ครบก่อน deploy:
+
+1. เพิ่มโดเมนใน Firebase Authentication > Settings > Authorized domains
+2. เพิ่ม https://<โดเมน>/__/auth/handler ใน Google OAuth authorized redirect URIs
+   หรือ firebase.json แล้วรัน firebase deploy --only auth --project <project-id>
+3. ตั้ง NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ให้ตรงกับโดเมนเว็บ แล้ว build/deploy ใหม่
+4. คง transparent proxy GET/POST สำหรับ /__/auth/* และ X-Frame-Options: SAMEORIGIN เฉพาะ helper
+   หน้าแอปอื่นยังใช้ DENY และ auth helper ใช้ Cache-Control: no-store
+
+การเปิดลิงก์ Firebase callback โดยตรงหรือย้ายเบราว์เซอร์กลางทางจะไม่มี initial state
+ให้กลับมาเริ่มที่ลิงก์ QuizPop ในเบราว์เซอร์ที่จะใช้ตลอดขั้นตอนแทน
+ยังต้องยืนยัน Google Login บน iPad เครื่องที่พบปัญหาจริงอีกครั้ง
+
 ## โครงสร้าง
 
 - app/page.tsx — แดชบอร์ดแอดมิน ตัวแก้ไขควิซ และหน้าจอเกม
@@ -100,7 +128,7 @@ npm run build
 | ตัวแปร                            | หน้าที่                              |
 | -------------------------------- | --------------------------------- |
 | NEXT_PUBLIC_FIREBASE_API_KEY     | Firebase Web API key              |
-| NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN | โดเมน Firebase Authentication     |
+| NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN | โดเมนเว็บ production ที่ proxy auth helper |
 | NEXT_PUBLIC_FIREBASE_PROJECT_ID  | Firebase project ID สำหรับ browser |
 | NEXT_PUBLIC_FIREBASE_APP_ID      | Firebase Web app ID               |
 | FIREBASE_PROJECT_ID              | Firebase project ID สำหรับ server  |
@@ -132,7 +160,7 @@ Service account: quizpop-server@quizpop-543-261121.iam.gserviceaccount.com
 - production build ผ่านทั้งในเครื่องและ Vercel
 - ทดสอบ UI ด้วยข้อมูลสมมติ: เครือข่ายช้า 6 วินาที แสดง feedback หลังเลือกประมาณ 3–7 ms บนเครื่องทดสอบ รวมกรณีส่งไม่สำเร็จ ส่งซ้ำ และเปลี่ยนข้อระหว่างรอ
 - ตรวจหน้าสรุปที่ความกว้าง 390px ไม่มีแนวนอนล้นจอ และตรวจผู้เล่น 0/1/2/หลายคน/คะแนนเสมอกัน
-- unit tests 28 รายการผ่าน ครอบคลุมการเล่นตั้งแต่เริ่มจนจบ คะแนน เวลา ตอบซ้ำ ปกปิดเฉลย ห้องหมดอายุ และสิทธิ์แอดมิน
+- unit tests 34 รายการผ่าน (รวม browser routing, recovery link และ auth proxy configuration) ครอบคลุมการเล่นตั้งแต่เริ่มจนจบ คะแนน เวลา ตอบซ้ำ ปกปิดเฉลย ห้องหมดอายุ และสิทธิ์แอดมิน
 - ตรวจ HTTP บน production: / และ /admin ตอบ 200, status แจ้ง configured=true, API ห้องสอบที่ไม่เข้าสู่ระบบตอบ 401
 - Google provider เปิดใช้งานแล้ว และตั้ง Authorized domains สำหรับโดเมน production แล้ว
 - เจ้าของบัญชียืนยันว่าเข้าสู่หน้าแอดมินด้วย Google ได้
