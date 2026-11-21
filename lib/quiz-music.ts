@@ -10,6 +10,9 @@ export class QuizMusic {
     readonly audio: HTMLAudioElement,
     private changed: (state: MusicPlayback) => void,
   ) {
+    audio.volume = 1;
+    audio.muted = false;
+    audio.defaultMuted = false;
     audio.loop = true;
     audio.preload = "auto";
     audio.setAttribute("playsinline", "");
@@ -26,10 +29,8 @@ export class QuizMusic {
     this.listeners.push([name, listener]);
     this.audio.addEventListener(name, listener);
   }
+  get requested() { return this.wanted; }
   get playing() { return !this.audio.paused && !this.audio.ended && this.audio.readyState >= 3; }
-  setVolume(volume: number) {
-    this.audio.volume = Math.max(0, Math.min(1, volume));
-  }
   setUrgent(urgent: boolean) {
     this.audio.playbackRate = urgent ? 1.25 : 1;
   }
@@ -41,6 +42,8 @@ export class QuizMusic {
     try {
       if (this.audio.error) this.audio.load();
       this.audio.muted = false;
+      this.audio.defaultMuted = false;
+      this.audio.volume = 1;
       // Keep this call synchronous with click/touchend. No effect or await before play().
       const started = this.audio.play();
       await started;

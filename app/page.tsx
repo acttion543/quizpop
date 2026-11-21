@@ -39,6 +39,7 @@ import { AuthPortal } from "@/components/auth-portal";
 import { AnswerPanel } from "@/components/answer-panel";
 import { GameResults } from "@/components/game-results";
 import { GameMusic } from "@/components/game-music";
+import { requestGameAudio } from "@/components/game-audio-provider";
 import { readRoomEvents } from "@/lib/read-room-events";
 import { shouldAcceptSnapshot } from "@/lib/room-snapshot";
 import { authFetch } from "@/lib/firebase-client";
@@ -300,6 +301,7 @@ function AdminApp() {
     return () => clearTimeout(t);
   }, [toast]);
   function enter(pin: string, role: string) {
+    void requestGameAudio();
     setSelected(null);
     setJoinOpen(false);
     setError("");
@@ -313,6 +315,7 @@ function AdminApp() {
     setError("");
   }
   async function host(q: Quiz) {
+    void requestGameAudio();
     setBusy(true);
     setError("");
     try {
@@ -331,6 +334,7 @@ function AdminApp() {
   }
   async function join(e: React.FormEvent) {
     e.preventDefault();
+    void requestGameAudio();
     setBusy(true);
     setError("");
     try {
@@ -343,6 +347,7 @@ function AdminApp() {
     }
   }
   function practice(q: Quiz) {
+    void requestGameAudio();
     const now = Date.now();
     const r: Room = {
       pin: "DEMO",

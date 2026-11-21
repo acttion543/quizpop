@@ -20,6 +20,14 @@ const config: NextConfig = {
         ],
       },
       {
+        source: "/audio/quizpop-suspense-v3.mp3",
+        headers: [{ key: "Content-Type", value: "audio/mpeg" }],
+      },
+      {
+        source: "/audio/quizpop-suspense-v2.wav",
+        headers: [{ key: "Content-Type", value: "audio/wav" }],
+      },
+      {
         source: "/__/auth/:path*",
         headers: [
           // Firebase embeds its helper iframe on our own origin.

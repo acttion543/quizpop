@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GameAudioProvider } from "@/components/game-audio-provider";
 import "./globals.css";
 import "./game-ux.css";
 import "./login-help.css";
@@ -15,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="th">
-      <body>{children}</body>
+      <body><GameAudioProvider>{children}</GameAudioProvider></body>
     </html>
   );
 }

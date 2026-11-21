@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getRedirectResult, onAuthStateChanged, type User } from "firebase/auth";
 import { LoginBrowserHelp } from "@/components/login-browser-help";
+import { requestGameAudio } from "@/components/game-audio-provider";
 import { embeddedBrowserName, loginErrorMessage } from "@/lib/login-support";
 import {
   ArrowUpRight,
@@ -365,6 +366,7 @@ function StudentLobby({
       setError("กรุณาใส่ชื่อเล่นก่อนเข้าห้อง");
       return;
     }
+    void requestGameAudio();
     setBusy(code);
     setError("");
     try {

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { QuizMusic, type MusicPlayback } from "../lib/quiz-music";
-import { readMusicPreferences } from "../lib/music-preferences";
+import config from "../next.config";
 
 class FakeAudio extends EventTarget {
   loop = false; preload = ""; volume = 1; playbackRate = 1; muted = true;
@@ -24,11 +24,17 @@ function setup() {
   return { audio, states, music };
 }
 
-test("sound defaults on, while an explicit off preference survives re-entry", () => {
-  assert.deepEqual(readMusicPreferences(null), { enabled: true, volume: 50 });
-  assert.deepEqual(readMusicPreferences("invalid"), { enabled: true, volume: 50 });
-  assert.deepEqual(readMusicPreferences('{"enabled":false,"volume":22}'), { enabled: false, volume: 22 });
-  assert.equal(readMusicPreferences('{"enabled":true,"volume":200}').volume, 100);
+test("room sound ignores previous zero-volume and mute preferences", async () => {
+  const audio = new FakeAudio();
+  audio.volume = 0; audio.muted = true;
+  const music = new QuizMusic(audio as unknown as HTMLAudioElement, () => {});
+  assert.equal(audio.volume, 1);
+  assert.equal(audio.muted, false);
+  assert.equal(music.requested, false);
+  await music.play();
+  assert.equal(music.requested, true);
+  assert.equal(audio.volume, 1);
+  music.dispose();
 });
 
 test("the real media play call starts inside the click stack before any await", async () => {
@@ -110,4 +116,22 @@ test("the deployed loop is a valid non-silent PCM WAV with no clipping", () => {
   const rms = Math.sqrt(energy / ((wav.length - 44) / 2));
   assert.ok(rms > .08 && peak < .9);
   assert.ok((wav.length - 44) / wav.readUInt32LE(28) > 15);
+});
+
+test("primary MP3 contains MPEG audio frames after its ID3 tag", () => {
+  const bytes = readFileSync(new URL("../public/audio/quizpop-suspense-v3.mp3", import.meta.url));
+  assert.equal(bytes.toString("ascii", 0, 3), "ID3");
+  const tagSize = (bytes[6] << 21) | (bytes[7] << 14) | (bytes[8] << 7) | bytes[9];
+  const offset = 10 + tagSize;
+  assert.equal(bytes[offset], 255);
+  assert.equal(bytes[offset + 1] & 224, 224);
+  assert.ok(bytes.length > 200000);
+});
+
+test("audio responses use explicit Safari-compatible MIME types", async () => {
+  const rules = await config.headers!();
+  for (const [extension, mime] of [["mp3", "audio/mpeg"], ["wav", "audio/wav"]]) {
+    const rule = rules.find(r => r.source.endsWith("." + extension));
+    assert.equal(rule?.headers.find(h => h.key === "Content-Type")?.value, mime);
+  }
 });
