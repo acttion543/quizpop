@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.vercel
+.env*
+*.log
+*.tsbuildinfo
+tests
+README.md
+service-account*.json

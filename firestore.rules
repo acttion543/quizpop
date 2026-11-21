@@ -1,0 +1,7 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Browser access is denied. Only the trusted server Admin SDK reads/writes.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

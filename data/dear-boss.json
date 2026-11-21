@@ -1,0 +1,110 @@
+{
+  "id": "custom-dear-boss-vocabulary",
+  "title": "Dear Boss — Vocabulary in Context",
+  "description": "10 questions about vocabulary, tone, and meaning in the Dear Boss letter.",
+  "category": "ควิซของฉัน",
+  "theme": "digital",
+  "emoji": "✉️",
+  "questions": [
+    {
+      "text": "In the sentence “I love my work and want to start again,” what does the word “work” mean in this context?",
+      "options": [
+        "A normal job",
+        "Criminal activities",
+        "School assignments",
+        "Housework"
+      ],
+      "correct": 1,
+      "seconds": 30
+    },
+    {
+      "text": "In the phrase “funny little games,” what does the word “funny” suggest?",
+      "options": [
+        "Something genuinely hilarious",
+        "Something confusing",
+        "A mocking and disturbing attitude",
+        "Something educational"
+      ],
+      "correct": 2,
+      "seconds": 30
+    },
+    {
+      "text": "What does the word “catch” mean in the sentence “How can they catch me now?”",
+      "options": [
+        "To grab something",
+        "To arrest or capture someone",
+        "To understand a joke",
+        "To find something lost"
+      ],
+      "correct": 1,
+      "seconds": 30
+    },
+    {
+      "text": "In the greeting “Dear Boss,” what does the word “Boss” refer to?",
+      "options": [
+        "A family member",
+        "A close friend",
+        "A person in a position of authority",
+        "A police officer"
+      ],
+      "correct": 2,
+      "seconds": 30
+    },
+    {
+      "text": "What is the synonym of “catch” used in the presentation?",
+      "options": ["Escape", "Capture", "Release", "Hide"],
+      "correct": 1,
+      "seconds": 30
+    },
+    {
+      "text": "In the letter, what does “Good luck” communicate in context?",
+      "options": [
+        "A sincere wish for success",
+        "Fear of the police",
+        "Confidence and a challenge to the authorities",
+        "An apology"
+      ],
+      "correct": 2,
+      "seconds": 30
+    },
+    {
+      "text": "Which pair shows opposite meanings in the context of the letter?",
+      "options": [
+        "Catch – Capture",
+        "Last – Next",
+        "Knife – Weapon",
+        "Lady – Woman"
+      ],
+      "correct": 1,
+      "seconds": 30
+    },
+    {
+      "text": "What is the broader category of the word “knife”?",
+      "options": ["Furniture", "Clothing", "Weapon", "Food"],
+      "correct": 2,
+      "seconds": 30
+    },
+    {
+      "text": "What does the phrase “keep this letter back” mean?",
+      "options": [
+        "Publish the letter immediately",
+        "Hide or withhold the letter",
+        "Send the letter to the police",
+        "Destroy the letter"
+      ],
+      "correct": 1,
+      "seconds": 30
+    },
+    {
+      "text": "Why is the word “work” interesting in the letter?",
+      "options": [
+        "It has a positive meaning only",
+        "It refers to an ordinary occupation only",
+        "It sounds neutral but refers to criminal activities in context",
+        "It refers to helping the police"
+      ],
+      "correct": 2,
+      "seconds": 30
+    }
+  ]
+}
